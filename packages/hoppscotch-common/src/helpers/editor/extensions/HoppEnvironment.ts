@@ -374,10 +374,15 @@ export class HoppEnvironmentPlugin {
     subscribeToStream: StreamSubscriberFunc,
     private editorView: Ref<EditorView | undefined>
   ) {
-    // Watch the current active tab to update the variables accordingly
+    // Watch only the request/collection variables that affect environment
+    // highlighting, instead of deep-watching the entire active tab (which
+    // includes headers, params, body, auth, tests, scripts, response, etc).
+    // Deep-watching the whole tab meant that any unrelated mutation - such as
+    // toggling the request body's Content-Type - re-triggered a full CodeMirror
+    // decoration rebuild in every mounted editor for the tab (see #6339).
     watch(
-      () => restTabs.currentActiveTab.value,
-      (currentTab) => {
+      () => {
+        const currentTab = restTabs.currentActiveTab.value
         const request =
           currentTab.document.type === "example-response"
             ? currentTab.document.response.originalRequest
@@ -397,6 +402,9 @@ export class HoppEnvironmentPlugin {
             ? request.requestVariables
             : []
 
+        return { requestVariables, collectionVariables }
+      },
+      ({ requestVariables, collectionVariables }) => {
         this.envs = getEffectiveVariablesForRequest(
           requestVariables,
           collectionVariables,
