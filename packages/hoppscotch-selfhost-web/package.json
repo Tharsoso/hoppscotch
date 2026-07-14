@@ -20,7 +20,10 @@
     "do-typecheck": "pnpm run lint",
     "do-lintfix": "pnpm run lintfix",
     "gql-codegen": "graphql-codegen --require dotenv/config --config gql-codegen.yml dotenv_config_path=\"../../.env\"",
-    "postinstall": "pnpm run gql-codegen"
+    "postinstall": "pnpm run gql-codegen",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "test:e2e": "start-server-and-test dev:vite http://localhost:3000 cy:run"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.2.8",
@@ -71,6 +74,7 @@
     "@vue/eslint-config-typescript": "14.8.0",
     "autoprefixer": "10.5.0",
     "cross-env": "10.1.0",
+    "cypress": "15.18.1",
     "dotenv": "17.4.2",
     "eslint": "9.39.2",
     "eslint-plugin-prettier": "5.5.6",
@@ -79,6 +83,7 @@
     "npm-run-all": "4.1.5",
     "postcss": "8.5.15",
     "prettier-plugin-tailwindcss": "0.7.2",
+    "start-server-and-test": "3.0.11",
     "tailwindcss": "3.4.16",
     "typescript": "5.9.3",
     "unplugin-fonts": "1.4.0",
