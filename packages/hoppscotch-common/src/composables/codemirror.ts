@@ -103,12 +103,23 @@ type CodeMirrorOptions = {
   onInit?: (view: EditorView) => void
 }
 
+/**
+ * Serializes the full editor document into a single string.
+ *
+ * Centralizes the (potentially expensive on large documents) full-document
+ * read that was previously duplicated across the completer, linter and the
+ * update listener. Keeping it in one place removes the duplication (DRY) and
+ * gives a single choke point should the read ever need to be optimized.
+ */
+const getDocText = (state: EditorState): string =>
+  state.doc.toJSON().join(state.lineBreak)
+
 const hoppCompleterExt = (completer: Completer): Extension => {
   return autocompletion({
     override: [
       async (context) => {
-        // Expensive operation! Disable on bigger files ?
-        const text = context.state.doc.toJSON().join(context.state.lineBreak)
+        // Expensive operation on large documents (full-document read)
+        const text = getDocText(context.state)
 
         const line = context.state.doc.lineAt(context.pos)
         const lineStart = line.from
@@ -144,10 +155,8 @@ const hoppLinterExt = (hoppLinter: LinterDefinition | undefined): Extension => {
   return linter(async (view) => {
     if (!hoppLinter) return []
 
-    // Requires full document scan, hence expensive on big files, force disable on big files ?
-    const linterResult = await hoppLinter(
-      view.state.doc.toJSON().join(view.state.lineBreak)
-    )
+    // Full document scan, hence expensive on large documents
+    const linterResult = await hoppLinter(getDocText(view.state))
 
     return linterResult.map((result) => {
       const startPos =
@@ -206,37 +215,48 @@ const streamLanguageMap: Record<string, any> = {
 }
 
 /**
+ * Exact MIME / identifier → language factory map.
+ *
+ * Replaces the previous long `if/else if` chain in `getLanguage` with a lookup
+ * table (Strategy pattern). New languages can now be registered by adding an
+ * entry here, without modifying `getLanguage` itself (Open/Closed Principle).
+ * Factories are lazy so `StreamLanguage.define` only runs when the language is
+ * actually requested, preserving the previous on-demand behaviour.
+ */
+const languageStrategies: Record<string, () => Language> = {
+  "application/javascript": () => javascriptLanguage,
+  javascript: () => javascriptLanguage,
+  graphql: () => GQLLanguage,
+  "application/xml": () => xmlLanguage,
+  htmlmixed: () => StreamLanguage.define(html),
+  "application/x-sh": () => StreamLanguage.define(shell),
+  "text/x-yaml": () => StreamLanguage.define(yaml),
+}
+
+/**
  * Returns the appropriate CodeMirror language object based on the provided MIME type.
  *
- * Handles specific content types like JSON, JavaScript, GraphQL, XML, etc.
- * For simpler languages that directly match the import name, uses a lookup map
- * to reduce repetition and automatically defines the StreamLanguage.
+ * Resolution order:
+ * 1. JSON content types (matched by predicate, since many MIME variants map to JSONC)
+ * 2. Exact-match strategies (see `languageStrategies`)
+ * 3. Simple stream languages whose import name matches the identifier (`streamLanguageMap`)
  *
  * @param langMime - The MIME type or shorthand language identifier (e.g., "javascript", "go", "python")
- * @returns The corresponding CodeMirror Language object
+ * @returns The corresponding CodeMirror Language object, or `null` if unsupported
  */
 const getLanguage = (langMime: string): Language | null => {
-  // Special case for JSON types
+  // Special case for JSON types (many MIME variants collapse to JSONC)
   if (isJSONContentType(langMime)) {
     return jsoncLanguage
-  } else if (
-    langMime === "application/javascript" ||
-    langMime === "javascript"
-  ) {
-    return javascriptLanguage
-  } else if (langMime === "graphql") {
-    return GQLLanguage
-  } else if (langMime === "application/xml") {
-    return xmlLanguage
-  } else if (langMime === "htmlmixed") {
-    return StreamLanguage.define(html)
-  } else if (langMime === "application/x-sh") {
-    return StreamLanguage.define(shell)
-  } else if (langMime === "text/x-yaml") {
-    return StreamLanguage.define(yaml)
   }
 
-  // Handle cases where langMime directly matches the import name
+  // Exact-match language strategies
+  const strategy = languageStrategies[langMime]
+  if (strategy) {
+    return strategy()
+  }
+
+  // Simple stream languages whose import name matches the identifier
   const streamLang = streamLanguageMap[langMime]
   if (streamLang) {
     return StreamLanguage.define(streamLang)
@@ -278,6 +298,50 @@ const parseDoc = (
 
   return doc
 }
+
+/**
+ * Builds the editor keymap extensions.
+ *
+ * Extracted out of `initView` (which had grown into a God function) so the
+ * keyboard-shortcut configuration lives in a single, self-contained unit with
+ * a clear responsibility (SRP). Higher-precedence shortcuts (redo, Ctrl-Enter)
+ * are wrapped in `Prec.highest` to win over the defaults.
+ */
+const buildEditorKeymap = (): Extension[] => [
+  keymap.of([
+    ...defaultKeymap,
+    {
+      key: "Tab",
+      preventDefault: true,
+      run: insertTab,
+    },
+    {
+      key: "Shift-Tab",
+      preventDefault: true,
+      run: indentLess,
+    },
+  ]),
+  Prec.highest(
+    keymap.of([
+      {
+        key: "Ctrl-y",
+        mac: "Cmd-y",
+        preventDefault: true,
+        run: redo,
+      },
+    ])
+  ),
+  Prec.highest(
+    keymap.of([
+      {
+        key: "Ctrl-Enter" /* Windows */,
+        mac: "Cmd-Enter" /* Mac */,
+        preventDefault: true,
+        run: () => true,
+      },
+    ])
+  ),
+]
 
 const getEditorLanguage = (
   langMime: string,
@@ -432,10 +496,8 @@ export function useCodemirror(
             }
 
             if (update.docChanged) {
-              // Expensive on big files ?
-              cachedValue.value = update.state.doc
-                .toJSON()
-                .join(update.state.lineBreak)
+              // Expensive on large documents (full-document read)
+              cachedValue.value = getDocText(update.state)
               if (!options.extendedEditorConfig.readOnly) {
                 // Only update if the value is actually different to prevent circular updates
                 if (value.value !== cachedValue.value) {
@@ -491,39 +553,7 @@ export function useCodemirror(
           ? [EditorView.lineWrapping]
           : []
       ),
-      keymap.of([
-        ...defaultKeymap,
-        {
-          key: "Tab",
-          preventDefault: true,
-          run: insertTab,
-        },
-        {
-          key: "Shift-Tab",
-          preventDefault: true,
-          run: indentLess,
-        },
-      ]),
-      Prec.highest(
-        keymap.of([
-          {
-            key: "Ctrl-y",
-            mac: "Cmd-y",
-            preventDefault: true,
-            run: redo,
-          },
-        ])
-      ),
-      Prec.highest(
-        keymap.of([
-          {
-            key: "Ctrl-Enter" /* Windows */,
-            mac: "Cmd-Enter" /* Mac */,
-            preventDefault: true,
-            run: () => true,
-          },
-        ])
-      ),
+      ...buildEditorKeymap(),
       tooltips({
         parent: document.body,
         position: "absolute",
