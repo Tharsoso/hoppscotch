@@ -43,3 +43,43 @@ jobs:
 
       - name: Run tests
         run: pnpm test
+
+  quality:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: mv .env.example .env
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/hoppscotch
+          DATA_ENCRYPTION_KEY: "12345678901234567890123456789012"
+
+      # NOTE: the monorepo currently has pre-existing lint/typecheck debt
+      # unrelated to individual PRs, so these steps report issues without
+      # blocking the pipeline. Once the existing debt is cleared, remove
+      # `continue-on-error` to make this job a real merge gate.
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Typecheck
+        run: pnpm typecheck
+        continue-on-error: true
