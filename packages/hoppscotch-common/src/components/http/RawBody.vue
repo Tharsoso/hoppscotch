@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-1 flex-col" data-testid="request-body-editor">
+  <div class="flex flex-1 flex-col">
     <div
       class="sticky top-upperMobileStickyFold z-10 flex flex-shrink-0 items-center justify-between overflow-x-auto border-b border-dividerLight bg-primary pl-4 sm:top-upperMobileTertiaryStickyFold"
     >

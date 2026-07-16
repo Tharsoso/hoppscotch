@@ -188,8 +188,3 @@ devenv.local.nix
 .cursor/
 .aider*
 .windsurfrules
-
-# Cypress
-cypress/screenshots/
-cypress/videos/
-cypress/downloads/

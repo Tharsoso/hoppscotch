@@ -61,7 +61,6 @@
       "bcrypt",
       "canvas",
       "core-js",
-      "cypress",
       "esbuild",
       "isolated-vm",
       "prisma",
