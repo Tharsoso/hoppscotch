@@ -7,23 +7,34 @@
 
 | Integrante | Papel principal |
 |---|---|
-| Tharsoso (Pessoa A) | Caminho A (correção da issue #6339) + testes de aceitação Cypress |
+| Tharsoso (Pessoa A) | Caminho A (correção da issue #6008) + testes de aceitação Cypress |
 | João Vitor Cota (Pessoa B) | Caminho B (refatoração + code smells + padrões), arquitetura, DevOps/CI-CD, documentação |
 
 > Ambos revisam os PRs um do outro (revisão entre membros — requisito do TP).
 
 ## Caminho A — Manutenção Corretiva
 
-- **Issue escolhida:** [#6339 — UI freeze while changing Content type](https://github.com/hoppscotch/hoppscotch/issues/6339)
-- **Causa raiz:** watcher com `deep: true` sobre o documento inteiro da aba
-  ativa em `helpers/editor/extensions/HoppEnvironment.ts`, que percorre a
-  árvore reativa completa (incluindo corpo e resposta JSON) a cada mudança.
-- **Descrição da solução:** substituir o `deep watch` por um watcher enxuto
-  (identidade da aba + `requestVariables` + variáveis de coleção) e aplicar
-  *debounce* na reconfiguração do editor. Detalhes em
-  [`padroes_e_smells.md`](./padroes_e_smells.md) (Smell #1).
-- **Validação:** _(preencher)_ evidências de reprodução antes/depois
-  (profiler do DevTools) + testes de aceitação (`testes_devops.md`).
+- **Issue escolhida:** [#6008 — The string encrypted by sha256 in the system does not match the actual sha256 encrypted string](https://github.com/hoppscotch/hoppscotch/issues/6008)
+- **Causa raiz:** o `TextEncoder`/`TextDecoder` usados dentro do sandbox de
+  scripts (pre-request/testes) vêm do módulo `encoding()` da biblioteca de
+  terceiros `faraday-cage`. A função genérica dessa biblioteca que converte
+  valores do host para dentro da VM isolada só trata como array de verdade
+  valores que passam em `Array.isArray()`. Um `Uint8Array` (o que
+  `TextEncoder.encode()` de fato devolve) falha nesse teste e cai no caminho
+  de "objeto comum", que copia os bytes indexados mas descarta `length`/
+  `byteLength`. Resultado: `crypto.subtle.digest()` não sabe quantos bytes
+  processar, trata como 0 e acaba sempre fazendo o hash de um array vazio —
+  não importa o texto de entrada.
+- **Descrição da solução:** criar um módulo próprio de `TextEncoder`/
+  `TextDecoder` em `hoppscotch-js-sandbox/src/cage-modules/encoding.ts`,
+  reaproveitando as funções de marshaling já corretas usadas pelo módulo de
+  `crypto` (`uint8ArrayToVmArray`/`vmArrayToUint8Array`, em
+  `cage-modules/utils/vm-marshal.ts`), e substituir o `encoding()` quebrado do
+  `faraday-cage` por esse módulo próprio em `cage-modules/default.ts`.
+- **Validação:** reprodução manual na tela (antes: hash sempre igual ao
+  SHA-256 de string vazia; depois: hash correto e batendo com o valor
+  esperado) + suíte completa do pacote (1388 testes) sem regressões. Detalhes
+  em [`testes_devops.md`](./testes_devops.md).
 
 ## Caminho B — Engenharia de Qualidade e Refatoração
 
@@ -36,18 +47,17 @@
 
 ## Lista de Pull Requests
 
-> Preencher com os links reais conforme os PRs forem abertos no fork.
 
 | PR | Conteúdo | Autor | Branch | Link |
 |---|---|---|---|---|
-| PR1 | Arquitetura (`documentacao/arquitetura.md`) | João (B) | `docs/arquitetura` | _(preencher)_ |
-| PR2 | Padrões e smells (`documentacao/padroes_e_smells.md`) | João (B) | `docs/padroes-smells` | _(preencher)_ |
+| PR1 | Arquitetura (`documentacao/arquitetura.md`) | João (B) | `docs/arquitetura` | https://github.com/Tharsoso/hoppscotch/pull/1 |
+| PR2 | Padrões e smells (`documentacao/padroes_e_smells.md`) | João (B) | `docs/padroes-smells` | https://github.com/Tharsoso/hoppscotch/pull/3 |
 | PR3 | Refatoração (Caminho B) | João (B) | `refactor/codemirror-quality` | _(preencher)_ |
 | PR4 | Testes de aceitação (Cypress) | Tharsoso (A) | `test/cypress-acceptance-tests` | _(preencher)_ |
 | PR5 | DevOps / CI (`tests.yml` job de qualidade) | João (B) | `ci/quality-job` | _(preencher)_ |
-| PR6 | Correção da issue #6339 (Caminho A) | Tharsoso (A) | `fix/content-type-freeze` | _(preencher)_ |
+| PR6 | Correção da issue #6008 (Caminho A) | Tharsoso (A) | `fix/sandbox-text-encoder` | _(preencher)_ |
 
 ## Links de entrega (Moodle)
 
-- **Fork:** _(preencher com o link do fork do colega)_
-- **Repositório público:** sim / não — _(confirmar)_
+- **Fork:** https://github.com/Tharsoso/hoppscotch
+- **Repositório público:** sim
