@@ -72,7 +72,7 @@
 | PR3 | Refatoração (Caminho B) | João (B) | `refactor/codemirror-quality` | https://github.com/Tharsoso/hoppscotch/pull/4 |
 | PR4 | Testes de aceitação (Cypress) | Tharsoso (A) | `test/cypress-sandbox-encoding` | https://github.com/Tharsoso/hoppscotch/pull/7 |
 | PR5 | DevOps / CI (`tests.yml` job de qualidade) | João (B) | `ci/quality-job` | https://github.com/Tharsoso/hoppscotch/pull/5 |
-| PR6 | Correção da issue #6008 (Caminho A) | Tharsoso (A) | `fix/sandbox-text-encoder` | https://github.com/Tharsoso/hoppscotch/pull/6(link PR do fork) https://github.com/hoppscotch/hoppscotch/pull/6512 (link PR para o repositório original) |
+| PR6 | Correção da issue #6008 (Caminho A) | Tharsoso (A) | `fix/sandbox-text-encoder` | https://github.com/Tharsoso/hoppscotch/pull/6 (link PR do fork) https://github.com/hoppscotch/hoppscotch/pull/6512 (link PR para o repositório original) |
 
 ## Links de entrega (Moodle)
 
