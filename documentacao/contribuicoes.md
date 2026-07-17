@@ -52,9 +52,9 @@
 |---|---|---|---|---|
 | PR1 | Arquitetura (`documentacao/arquitetura.md`) | João (B) | `docs/arquitetura` | https://github.com/Tharsoso/hoppscotch/pull/1 |
 | PR2 | Padrões e smells (`documentacao/padroes_e_smells.md`) | João (B) | `docs/padroes-smells` | https://github.com/Tharsoso/hoppscotch/pull/3 |
-| PR3 | Refatoração (Caminho B) | João (B) | `refactor/codemirror-quality` | _(preencher)_ |
+| PR3 | Refatoração (Caminho B) | João (B) | `refactor/codemirror-quality` | https://github.com/Tharsoso/hoppscotch/pull/4 |
 | PR4 | Testes de aceitação (Cypress) | Tharsoso (A) | `test/cypress-acceptance-tests` | _(preencher)_ |
-| PR5 | DevOps / CI (`tests.yml` job de qualidade) | João (B) | `ci/quality-job` | _(preencher)_ |
+| PR5 | DevOps / CI (`tests.yml` job de qualidade) | João (B) | `ci/quality-job` | https://github.com/Tharsoso/hoppscotch/pull/5 |
 | PR6 | Correção da issue #6008 (Caminho A) | Tharsoso (A) | `fix/sandbox-text-encoder` | _(preencher)_ |
 
 ## Links de entrega (Moodle)
