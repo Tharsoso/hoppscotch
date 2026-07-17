@@ -249,8 +249,9 @@ describe("hopp test [options] <file_path_or_id>", { timeout: 100000 }, () => {
       // see the fix for #6008). Node wraps long arrays across multiple
       // lines, so pull out the numbers between "Encoded: [" and "]" instead
       // of matching on exact whitespace/line breaks.
-      const encodedBytes = result.stdout
-        .match(/Encoded:\s*\[([\s\S]*?)\]/)?.[1]
+      const encodedMatch = result.stdout.match(/Encoded:\s*\[([\s\S]*?)\]/);
+      expect(encodedMatch).not.toBeNull();
+      const encodedBytes = encodedMatch![1]
         .split(",")
         .map((n) => parseInt(n.trim(), 10));
       expect(encodedBytes).toEqual([

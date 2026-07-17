@@ -23,20 +23,40 @@ export type CustomEncodingModuleConfig = {
 // with the same helpers the crypto module already relies on, which do
 // preserve `byteLength`/real array semantics.
 const TEXT_ENCODING_POLYFILL_SRC = `
-(function (hostTextEncoderEncode, hostTextDecoderCreate, hostTextDecoderDecode) {
+(function (
+  hostTextEncoderEncode,
+  hostTextEncoderEncodeInto,
+  hostTextDecoderCreate,
+  hostTextDecoderDecode
+) {
   "use strict";
 
   function TextEncoder() {}
 
-  TextEncoder.prototype.encode = function (input) {
-    if (input === undefined) input = "";
-    return hostTextEncoderEncode(String(input));
-  };
+  Object.defineProperty(TextEncoder.prototype, "encode", {
+    value: function (input) {
+      if (input === undefined) input = "";
+      return hostTextEncoderEncode(String(input));
+    },
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+
+  Object.defineProperty(TextEncoder.prototype, "encodeInto", {
+    value: function (source, destination) {
+      if (source === undefined) source = "";
+      return hostTextEncoderEncodeInto(String(source), destination);
+    },
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
 
   Object.defineProperty(TextEncoder.prototype, "encoding", {
     value: "utf-8",
     writable: false,
-    enumerable: true,
+    enumerable: false,
     configurable: false,
   });
 
@@ -44,47 +64,53 @@ const TEXT_ENCODING_POLYFILL_SRC = `
     if (label === undefined) label = "utf-8";
     if (options === undefined) options = {};
 
-    this.__decoderId = hostTextDecoderCreate(
+    var created = hostTextDecoderCreate(
       label,
       Boolean(options.fatal),
       Boolean(options.ignoreBOM)
     );
-    this.__encoding = String(label).toLowerCase();
+    this.__decoderId = created.id;
+    this.__encoding = created.encoding;
     this.__fatal = Boolean(options.fatal);
     this.__ignoreBOM = Boolean(options.ignoreBOM);
   }
 
-  TextDecoder.prototype.decode = function (input, options) {
-    if (options === undefined) options = {};
-    return hostTextDecoderDecode(
-      this.__decoderId,
-      input,
-      Boolean(options.stream)
-    );
-  };
+  Object.defineProperty(TextDecoder.prototype, "decode", {
+    value: function (input, options) {
+      if (options === undefined) options = {};
+      return hostTextDecoderDecode(
+        this.__decoderId,
+        input,
+        Boolean(options.stream)
+      );
+    },
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
 
   Object.defineProperty(TextDecoder.prototype, "encoding", {
     get: function () {
       return this.__encoding;
     },
-    enumerable: true,
-    configurable: false,
+    enumerable: false,
+    configurable: true,
   });
 
   Object.defineProperty(TextDecoder.prototype, "fatal", {
     get: function () {
       return this.__fatal;
     },
-    enumerable: true,
-    configurable: false,
+    enumerable: false,
+    configurable: true,
   });
 
   Object.defineProperty(TextDecoder.prototype, "ignoreBOM", {
     get: function () {
       return this.__ignoreBOM;
     },
-    enumerable: true,
-    configurable: false,
+    enumerable: false,
+    configurable: true,
   });
 
   globalThis.TextEncoder = TextEncoder;
@@ -126,6 +152,51 @@ export const customEncodingModule = (config: CustomEncodingModuleConfig = {}) =>
       }
     )
 
+    // encodeInto writes into a caller-supplied destination array instead of
+    // returning a new one. The destination is a VM array (this sandbox
+    // represents byte buffers as plain arrays, see vm-marshal.ts), so it's
+    // sized via `length` and written back index-by-index, same convention
+    // as vmArrayToUint8Array/uint8ArrayToVmArray.
+    const encodeIntoFn = defineSandboxFunctionRaw(
+      ctx,
+      "__hostTextEncoderEncodeInto",
+      (...args) => {
+        const str = (ctx.vm.dump(args[0]) as string | undefined) ?? ""
+        const destHandle = args[1]
+
+        const destLengthHandle = ctx.vm.getProp(destHandle, "length")
+        const destLength = ctx.vm.getNumber(destLengthHandle)
+        destLengthHandle.dispose()
+
+        const destBuffer = new Uint8Array(destLength)
+        const { read, written } = hostEncoder.encodeInto(str, destBuffer)
+
+        for (let i = 0; i < written; i++) {
+          ctx.vm.setProp(
+            destHandle,
+            i,
+            ctx.scope.manage(ctx.vm.newNumber(destBuffer[i]))
+          )
+        }
+
+        const resultObj = ctx.scope.manage(ctx.vm.newObject())
+        ctx.vm.setProp(
+          resultObj,
+          "read",
+          ctx.scope.manage(ctx.vm.newNumber(read))
+        )
+        ctx.vm.setProp(
+          resultObj,
+          "written",
+          ctx.scope.manage(ctx.vm.newNumber(written))
+        )
+        return resultObj
+      }
+    )
+
+    // Returns the host TextDecoder's own canonical `encoding` name (e.g.
+    // "utf8" -> "utf-8") instead of re-deriving it, so aliases resolve the
+    // same way they do in a real TextDecoder.
     const createDecoderFn = defineSandboxFunctionRaw(
       ctx,
       "__hostTextDecoderCreate",
@@ -138,7 +209,19 @@ export const customEncodingModule = (config: CustomEncodingModuleConfig = {}) =>
           const decoder = new TextDecoderImpl(label, { fatal, ignoreBOM })
           const id = nextDecoderId++
           decoders.set(id, decoder)
-          return ctx.scope.manage(ctx.vm.newNumber(id))
+
+          const resultObj = ctx.scope.manage(ctx.vm.newObject())
+          ctx.vm.setProp(
+            resultObj,
+            "id",
+            ctx.scope.manage(ctx.vm.newNumber(id))
+          )
+          ctx.vm.setProp(
+            resultObj,
+            "encoding",
+            ctx.scope.manage(ctx.vm.newString(decoder.encoding))
+          )
+          return resultObj
         } catch (e) {
           throw e instanceof Error ? e : new Error(String(e))
         }
@@ -177,6 +260,7 @@ export const customEncodingModule = (config: CustomEncodingModuleConfig = {}) =>
         polyfillFn,
         ctx.vm.undefined,
         encodeFn,
+        encodeIntoFn,
         createDecoderFn,
         decodeFn
       )
