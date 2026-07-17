@@ -5,57 +5,82 @@
 ## Parte 1 — Testes de aceitação automatizados
 
 **Ferramenta:** Cypress (E2E), implementado por Tharsoso (Pessoa A) na branch
-`test/cypress-acceptance-tests`, no pacote `hoppscotch-selfhost-web`.
+`test/cypress-sandbox-encoding`, no pacote `hoppscotch-selfhost-web`. Cobre a
+correção da issue [#6008](https://github.com/hoppscotch/hoppscotch/issues/6008)
+("The string encrypted by sha256 in the system does not match the actual
+sha256 encrypted string"), feita na branch `fix/sandbox-text-encoder`
+(Caminho A).
+
+**Contexto do bug:** o sandbox experimental de scripts (QuickJS via
+`faraday-cage`) expõe `TextEncoder`/`TextDecoder` para os scripts de
+Pre-request/Tests. O marshalling genérico de valores do `faraday-cage`, ao
+passar um `Uint8Array` do host para dentro da VM, só trata corretamente
+valores que passam em `Array.isArray()` — um `Uint8Array` real falha nesse
+teste e cai num branch genérico de "objeto plano" que copia as chaves
+numéricas mas descarta `length`/`byteLength`. Resultado: `TextEncoder.encode()`
+devolvia um objeto sem tamanho dentro do sandbox, e qualquer código que
+dependesse desse tamanho (como `crypto.subtle.digest`) processava efetivamente
+zero bytes — daí o hash SHA-256 errado relatado na issue. A correção
+substitui o módulo de encoding do `faraday-cage` por um módulo próprio
+(`cage-modules/encoding.ts`) que reaproveita o marshaller correto que o
+projeto já usa para `crypto` (`uint8ArrayToVmArray`/`vmArrayToUint8Array`).
 
 **Local:** `packages/hoppscotch-selfhost-web/cypress/e2e/`
-- `content-type-freeze.cy.ts`
-- `env-variable-highlighting.cy.ts`
+- `sandbox-text-encoder.cy.ts`
 
-### Cenário 1 — Troca de content-type não congela a UI
+Os três testes rodam o script diretamente na aba **Pre-request Script** do
+app (o mesmo caminho de código relatado na issue) e leem o resultado via
+`console.log`, que o sandbox sempre encaminha para o console real do
+navegador (`cage-modules/default.ts`) — por isso os testes espionam
+`window.console.log` em vez da aba "Console" do app, que só reflete o
+Post-request Script.
 
-```gherkin
-Funcionalidade: Alternância de content-type do corpo da requisição
-  Cenário: Trocar de "None" para "application/json" mantém a UI responsiva
-    Dado que abri uma nova requisição REST
-    Quando eu seleciono o content-type "application/json"
-    Então o editor de corpo (raw body) deve estar visível
-    E a interface deve responder dentro de um limite de tempo aceitável
-```
-
-**O que cobre:** guarda de regressão contra o freeze da issue #6339 — a troca
-de content-type não deve bloquear a thread principal.
-
-### Cenário 2 — Trocar para "Nenhum" limpa o body corretamente
+### Cenário 1 — Hash SHA-256 correto de uma string codificada no script
 
 ```gherkin
-Funcionalidade: Alternância de content-type do corpo da requisição
-  Cenário: Trocar para "Nenhum" e voltar não deixa estado inconsistente
-    Dado que preenchi o body da requisição com um JSON
-    Quando eu troco o content-type para "Nenhum"
-    Então o body deve ficar vazio
-    Quando eu troco de volta para "application/json"
-    Então o body deve continuar vazio (sem lixo de estado anterior)
+Funcionalidade: TextEncoder/TextDecoder no sandbox de scripts
+  Cenário: crypto.subtle.digest calcula o SHA-256 correto de um texto
+    Dado que estou na aba "Pre-request Script" de uma requisição
+    Quando eu colo um script que codifica "Hello, World!" com TextEncoder
+      e calcula o hash SHA-256 do resultado com crypto.subtle.digest
+    E envio a requisição
+    Então o console deve logar o hash
+      "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
 ```
 
-**O que cobre:** efeitos colaterais da troca de content-type no estado do
-body, cenário relacionado ao mesmo fluxo da issue.
+**O que cobre:** reproduz exatamente o sintoma relatado na issue #6008 —
+antes da correção, o hash logado não batia com o SHA-256 real do texto
+(porque `crypto.subtle.digest` recebia um array com tamanho 0).
 
-### Cenário 3 — Highlight de variáveis de ambiente continua funcionando
+### Cenário 2 — TextEncoder.encode() produz um array de bytes real
 
 ```gherkin
-Funcionalidade: Destaque de variáveis de ambiente no editor
-  Cenário: Variável é destacada no body após trocar Content-Type repetidamente
-    Dado que criei um ambiente com uma variável
-    E selecionei esse ambiente
-    Quando eu digito a variável no corpo da requisição
-    E troco o content-type repetidamente
-    Então o token da variável deve continuar recebendo a classe de destaque
+Funcionalidade: TextEncoder/TextDecoder no sandbox de scripts
+  Cenário: encode() devolve um array com tamanho correto
+    Dado que estou na aba "Pre-request Script" de uma requisição
+    Quando eu colo um script que codifica "qualquer texto aqui" com TextEncoder
+    E envio a requisição
+    Então o console deve logar length 19, byteLength 19 e Array.isArray true
 ```
 
-**O que cobre:** garante que a correção do watcher em `HoppEnvironment.ts`
-(Caminho A) **não quebrou** o highlight de variáveis — teste de não-regressão.
-Usa um `data-testid` adicionado em `RawBody.vue` para selecionar o editor de
-forma robusta (em vez de índice posicional de `.cm-content`).
+**O que cobre:** verifica a causa raiz diretamente — antes da correção,
+`length`/`byteLength` vinham `undefined` e `Array.isArray()` era `false`
+(o valor caía no branch de "objeto plano" do marshaller quebrado).
+
+### Cenário 3 — Round-trip TextEncoder → TextDecoder
+
+```gherkin
+Funcionalidade: TextEncoder/TextDecoder no sandbox de scripts
+  Cenário: texto codificado e decodificado continua idêntico
+    Dado que estou na aba "Pre-request Script" de uma requisição
+    Quando eu colo um script que codifica "round trip works" com TextEncoder
+      e decodifica o resultado de volta com TextDecoder
+    E envio a requisição
+    Então o console deve logar "round trip works"
+```
+
+**O que cobre:** garante que o novo módulo de encoding funciona nos dois
+sentidos (encode e decode), não só no caminho que a issue original expôs.
 
 ### Instruções de execução
 
