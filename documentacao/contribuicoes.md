@@ -39,8 +39,9 @@
 ## Caminho B — Engenharia de Qualidade e Refatoração
 
 - **Code smells tratados:** ver [`padroes_e_smells.md`](./padroes_e_smells.md)
-  (mínimo 3): deep watch, long method / cadeia if-else de linguagem, custo
-  ignorado em arquivos grandes.
+  (mínimo 3): cadeia `if/else` de mapeamento de linguagem em `getLanguage`
+  (viola OCP), leitura de documento duplicada em três pontos (viola DRY),
+  God Function `initView` acumulando responsabilidades (viola SRP).
 - **Padrões aplicados/sugeridos:** Strategy (seleção de linguagem),
   Dependency Injection (`dioc`), Observer (RxJS).
 - **Descrição da refatoração:** três refatorações aplicadas em
