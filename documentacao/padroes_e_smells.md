@@ -7,9 +7,10 @@
 > **Commit da refatoração:** `refactor(common): melhora qualidade do composable do CodeMirror`
 > (branch `refactor/codemirror-quality`).
 >
-> ⚠️ **Coordenação da dupla:** o Caminho A (issue #6339, feito pela Pessoa A)
-> alterou `HoppEnvironment.ts`. Para evitar conflitos de merge, a refatoração do
-> Caminho B foi feita em `codemirror.ts`, um arquivo **não tocado** pela Pessoa A.
+> ⚠️ **Coordenação da dupla:** o Caminho A (issue #6008, feito pela Pessoa A)
+> corrige `hoppscotch-js-sandbox/src/cage-modules/encoding.ts`. Para evitar
+> conflitos de merge, a refatoração do Caminho B foi feita em `codemirror.ts`,
+> um arquivo **não tocado** pela Pessoa A.
 
 ## Code Smells (mínimo 3)
 
@@ -134,9 +135,9 @@ refatoração mantém esse padrão como base da arquitetura do editor.
 
 **Onde:** `newstore/environments` (`aggregateEnvsWithCurrentValue$`), consumido
 pelo `HoppEnvironmentPlugin`.
-**Justificativa:** a correção da issue #6339 (Caminho A) baseia-se justamente
-em **confiar nesse Observer** em vez do `deep watch`, demonstrando o padrão
-sendo usado corretamente.
+**Justificativa:** padrão já presente na arquitetura do app (independente do
+Caminho A), citado aqui como exemplo complementar de uso correto de Observer
+via streams reativos (RxJS) em vez de observação manual de estado.
 
 ## Resumo
 

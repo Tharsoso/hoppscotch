@@ -43,7 +43,23 @@
   ignorado em arquivos grandes.
 - **Padrões aplicados/sugeridos:** Strategy (seleção de linguagem),
   Dependency Injection (`dioc`), Observer (RxJS).
-- **Descrição da refatoração:** _(preencher com o diff final e justificativas)_.
+- **Descrição da refatoração:** três refatorações aplicadas em
+  `packages/hoppscotch-common/src/composables/codemirror.ts` (branch
+  `refactor/codemirror-quality`, PR3), sem alterar comportamento:
+  1. `getLanguage` — a cadeia `if/else if` de mapeamento MIME→linguagem
+     (que exigia editar a função a cada linguagem nova, violando OCP) foi
+     substituída por uma tabela de estratégias (`languageStrategies`),
+     aplicando o padrão **Strategy**.
+  2. `getDocText` — a leitura do documento inteiro
+     (`doc.toJSON().join(lineBreak)`), duplicada no completer, no linter e
+     no update listener (viola DRY), foi extraída para um helper único.
+  3. `buildEditorKeymap` — a configuração de keymaps, que fazia `initView`
+     crescer demais e acumular responsabilidades (God Function, viola
+     SRP), foi extraída para uma função coesa e isolada.
+
+  Diff completo, código antes/depois e justificativas por princípio em
+  [`padroes_e_smells.md`](./padroes_e_smells.md). Validado sem regressões
+  via `pnpm --filter hoppscotch-common lint` e `pnpm --filter hoppscotch-common typecheck`.
 
 ## Lista de Pull Requests
 
