@@ -126,7 +126,9 @@ graph TD
   consumidores de estado, o que é essencial num app com muitos painéis
   reagindo às mesmas fontes (ambientes, abas, respostas).
 
-> **Relação com o trabalho:** a issue tratada no Caminho A (#6339) e as
-> refatorações do Caminho B concentram-se na camada
-> `helpers/editor` + `composables` do `hoppscotch-common`, exatamente onde o
-> editor de código (CodeMirror) integra-se ao estado reativo.
+> **Relação com o trabalho:** as refatorações do Caminho B concentram-se na
+> camada `helpers/editor` + `composables` do `hoppscotch-common`, exatamente
+> onde o editor de código (CodeMirror) integra-se ao estado reativo. Já a
+> issue tratada no Caminho A (#6008) fica numa camada diferente — o pacote
+> `hoppscotch-js-sandbox`, responsável por isolar a execução de scripts de
+> pre-request/testes numa VM JS separada (QuickJS via `faraday-cage`).
